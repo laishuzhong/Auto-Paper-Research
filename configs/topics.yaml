@@ -1,0 +1,17 @@
+topics:
+  autism large language model:
+    synonyms:
+      - autism
+      - autistic
+      - ASD
+      - autism spectrum disorder
+      - neurodiversity
+      - social communication
+      - developmental disorder
+    questions:
+      - What tasks are addressed (screening, diagnosis support, therapy, education, caregiver support)?
+      - What data sources are used (clinical notes, interviews, social media, wearable, questionnaires)?
+      - What evaluation methodology is used (clinician eval, benchmarks, real-world studies)?
+      - What safety or ethics issues are discussed (privacy, minors, consent, bias, hallucination harms)?
+      - What deployment considerations are mentioned (on-device, cost, latency, monitoring)?
+      - What limitations and open problems are reported?
