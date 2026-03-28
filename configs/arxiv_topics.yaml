@@ -1,0 +1,17 @@
+defaults:
+  max_results: 20
+  sort: submittedDate
+  categories: []
+
+topics:
+  autism_llm:
+    query_terms:
+      - autism
+      - "autism spectrum disorder"
+      - "large language model"
+      - llm
+    categories:
+      - cs.CL
+      - cs.AI
+      - q-bio.NC
+    max_results: 30
