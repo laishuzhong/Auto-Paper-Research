@@ -1,5 +1,5 @@
 single_paper_summary_prompt: |
-  你是论文分析助手。请基于提供的单篇论文上下文，提炼结构化摘要并返回 JSON。
+  你是科研论文分析助手。请基于提供的单篇论文上下文，提炼结构化摘要并返回 JSON。
 
   只返回合法 JSON，格式如下：
   {
@@ -7,6 +7,8 @@ single_paper_summary_prompt: |
       "paper_id": "...",
       "title": "...",
       "tasks": ["..."],
+      "github_links": ["..."],
+      "contributions": ["..."],
       "data_sources": ["..."],
       "methods": ["..."],
       "experiments": ["..."],
@@ -24,6 +26,7 @@ single_paper_summary_prompt: |
   - 每个字段尽量给出 1-3 条要点。
   - evidence 中 chunk_id 必须来自上下文。
   - 仅返回 chunk_id，不要返回 quote；quote 将由系统从原文 chunk 自动提取英文原句。
+  - 如果某个字段没有相关信息，请返回空列表。
 
   输入信息：
   - 主题: {topic}
@@ -34,7 +37,7 @@ single_paper_summary_prompt: |
   {context_chunks}
 
 final_topic_summary_prompt: |
-  你是中文科研综述助手。请根据多篇论文的上下文与单篇摘要，生成主题级结论并返回 JSON。
+  你是科研综述助手。请根据多篇论文的上下文与单篇摘要，生成中文的主题级结论并返回 JSON。
 
   只返回合法 JSON，格式如下：
   {
@@ -46,14 +49,6 @@ final_topic_summary_prompt: |
         ]
       }
     ],
-    "paper_map": {
-      "概览": ["paper_id"],
-      "应用": ["paper_id"],
-      "评估": ["paper_id"],
-      "安全与伦理": ["paper_id"],
-      "部署": ["paper_id"],
-      "局限与开放问题": ["paper_id"]
-    }
   }
 
   规则：

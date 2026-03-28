@@ -9,6 +9,18 @@ from openai import OpenAI
 from ..models.schema import Chunk, Evidence, Finding
 
 
+SINGLE_PAPER_LIST_FIELDS = (
+    "tasks",
+    "github_links",
+    "contributions",
+    "data_sources",
+    "methods",
+    "experiments",
+    "results",
+    "limitations",
+)
+
+
 class OpenAISummarizer:
     def __init__(
         self,
@@ -76,6 +88,22 @@ class OpenAISummarizer:
 
         normalized = dict(paper_summary)
         normalized.setdefault("paper_id", paper_id)
+        title = normalized.get("title")
+        normalized["title"] = title if isinstance(title, str) else ""
+
+        field_aliases: dict[str, tuple[str, ...]] = {
+            "tasks": ("tasks",),
+            "github_links": ("github_links",),
+            "contributions": ("contributions",),
+            "data_sources": ("data_sources",),
+            "methods": ("methods",),
+            "experiments": ("experiments", "evaluation"),
+            "results": ("results", "deployment"),
+            "limitations": ("limitations",),
+        }
+
+        for target_field, candidates in field_aliases.items():
+            normalized[target_field] = _first_list_value(normalized, candidates)
 
         evidence_items = normalized.get("evidence", [])
         if not isinstance(evidence_items, list):
@@ -109,7 +137,16 @@ class OpenAISummarizer:
             cleaned_evidence.append({"chunk_id": canonical})
 
         normalized["evidence"] = cleaned_evidence
-        return normalized
+
+        # Keep only fields required by current single-paper schema.
+        canonical: dict[str, Any] = {
+            "paper_id": normalized.get("paper_id", paper_id),
+            "title": normalized.get("title", ""),
+        }
+        for field in SINGLE_PAPER_LIST_FIELDS:
+            canonical[field] = normalized.get(field, [])
+        canonical["evidence"] = normalized["evidence"]
+        return canonical
 
     def summarize(
         self,
@@ -358,6 +395,21 @@ def _canonicalize_single_paper_chunk_id(
             return guessed.chunk_id
 
     return None
+
+
+def _first_list_value(values: dict[str, Any], candidates: tuple[str, ...]) -> list[str]:
+    for key in candidates:
+        raw = values.get(key)
+        if isinstance(raw, list):
+            cleaned: list[str] = []
+            for item in raw:
+                if isinstance(item, str):
+                    value = item.strip()
+                    if value:
+                        cleaned.append(value)
+            if cleaned:
+                return cleaned
+    return []
 
 
 def _fallback_chunk_lookup(

@@ -9,9 +9,11 @@ topics:
       - social communication
       - developmental disorder
     questions:
-      - What tasks are addressed (screening, diagnosis support, therapy, education, caregiver support)?
-      - What data sources are used (clinical notes, interviews, social media, wearable, questionnaires)?
-      - What evaluation methodology is used (clinician eval, benchmarks, real-world studies)?
-      - What safety or ethics issues are discussed (privacy, minors, consent, bias, hallucination harms)?
-      - What deployment considerations are mentioned (on-device, cost, latency, monitoring)?
-      - What limitations and open problems are reported?
+      - What is the core problem this paper aims to solve, and why is this problem important in autism or mental health scenarios?
+      - What are the main contributions claimed by the paper (list 2-4 concrete contribution points)?
+      - What methodology is used (model architecture, training strategy, inference pipeline, and key implementation details)?
+      - What are the main innovations compared with prior work (technical novelty, data novelty, or evaluation novelty)?
+      - What key experiments are conducted to support the claims (main tasks, baselines, ablations, human evaluation, robustness)?
+      - What datasets are used (public/private, size, source, split strategy, and preprocessing)?
+      - Does the paper provide open-source resources (GitHub/code/model/data links)? If yes, extract the link and reproducibility details.
+      - What limitations, failure modes, and open problems are explicitly discussed by the authors?

@@ -100,7 +100,10 @@ def analyze_topic(
             summary_path = single_summary_dir / f"{paper_id}.json"
             summary = None
             if reuse_single_summary:
-                summary = load_single_paper_summary(summary_path)
+                summary = load_single_paper_summary(
+                    summary_path,
+                    prompt_config_path=prompt_config_path,
+                )
             if summary is None:
                 summary = summarizer.summarize_single_paper(
                     topic=topic,
