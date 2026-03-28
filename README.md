@@ -1,20 +1,27 @@
 # Auto Paper Research
 
-This repository provides a local PDF research pipeline:
+A local paper pipeline for researchers:
 
-1. Parse PDFs into markdown.
-2. Build section/paragraph chunks.
-3. Retrieve topic-relevant chunks.
-4. Generate single-paper summaries and a final topic report.
-5. Attach evidence lines that map back to source chunks.
+1. Crawl papers from arXiv by keywords and download PDFs.
+2. Parse PDFs locally and extract key evidence and findings.
+3. Generate topic-level markdown reports for reading and follow-up writing.
 
-## Requirements
+The recommended workflow is two-stage: fetch first, then analyze.
 
-1. Python `>=3.10`
-2. A Marker CLI command (`marker_single` recommended, or `marker`)
-3. OpenAI-compatible API access
+## What You Can Do With It
 
-## Install
+1. Enter topic keywords (supports AND/OR groups) and auto-build arXiv queries.
+2. Filter papers by date range (for example, only January 2026).
+3. Download papers to a local directory (for example, `pdf/tmp`).
+4. Generate reports automatically under `reports/topics/*.md`.
+
+## 0. Prerequisites
+
+1. Python >= 3.10
+2. Marker command available (recommended: `marker_single`)
+3. An OpenAI-compatible API endpoint (used in stage 2 summarization)
+
+## 1. Setup
 
 ```bash
 python -m venv .venv
@@ -22,7 +29,7 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-Create or edit `.env` in repo root:
+Create a `.env` file in the repository root:
 
 ```env
 OPENAI_API_KEY=your_key
@@ -32,176 +39,153 @@ OPENAI_MODEL=gpt-4.1-mini
 
 Notes:
 
-1. `OPENAI_API_KEY` is required.
-2. `OPENAI_BASE_URL` is optional for official OpenAI.
-3. `OPENAI_MODEL` defaults to `gpt-4.1-mini` if not set.
+1. `OPENAI_API_KEY` is required (stage 2 depends on it).
+2. `OPENAI_BASE_URL` is optional; if omitted, the default OpenAI endpoint is used.
+3. `OPENAI_MODEL` is optional; default is `gpt-4.1-mini`.
 
-## Quick Start
+## 2. Quick Start (Recommended Commands)
 
-Put PDFs under `pdf/`, then run:
+### Stage 1: Fetch arXiv Papers by Keywords and Download
+
+Example goal: fetch papers from January 2026 that satisfy:
+
+1. Keyword group A: `autism OR autistic`
+2. Keyword group B: `llm OR "large language model"`
+3. A and B are combined with AND
 
 ```bash
-research --topic "autism large language model" --out reports/topics/autism_llm.md
+research fetch-arxiv \
+  --and-group autism,autistic \
+  --and-group llm,"large language model" \
+  --query-fields ti,abs \
+  --date-from 2026-01-01 \
+  --date-to 2026-01-31 \
+  --pdf-dir pdf/tmp \
+  --manifest data/arxiv/fetch_manifest.jsonl \
+  --max-results 100
 ```
 
-Equivalent explicit form:
+If you want to preview matches without downloading PDFs:
 
 ```bash
-research analyze --topic "autism large language model" --out reports/topics/autism_llm.md
+research fetch-arxiv \
+  --and-group autism,autistic \
+  --and-group llm,"large language model" \
+  --query-fields ti,abs \
+  --date-from 2026-01-01 \
+  --date-to 2026-01-31 \
+  --max-results 100 \
+  --dry-run
 ```
 
-## Full Example
+### Stage 2: Analyze Locally and Generate a Report
 
 ```bash
-CUDA_VISIBLE_DEVICES=2 research \
+research analyze \
   --topic "autism large language model" \
-  --pdf-dir pdf \
-  --out reports/topics/autism_llm.md \
+  --pdf-dir pdf/tmp \
+  --out reports/topics/autism_llm_2026_01_tmp.md \
   --config configs/topics.yaml \
   --prompt-config configs/prompts.yaml \
-  --marker-cmd "marker_single --disable_multiprocessing" \
-  --single-summary-dir data/summaries \
-  --reuse-single-summary \
-  --max-chunks 40 \
-  --min-findings 10
+  --work-dir data/tmp_2026_01 \
+  --single-summary-dir data/tmp_2026_01/summaries \
+  --reuse-single-summary
 ```
 
-## CLI Options
+After running, you will get:
 
-Core options:
+1. Downloaded papers: `pdf/tmp/*.pdf`
+2. Fetch manifest: `data/arxiv/fetch_manifest.jsonl`
+3. Intermediate artifacts: `data/tmp_2026_01/*`
+4. Final report: `reports/topics/autism_llm_2026_01_tmp.md`
 
-1. `--topic`: topic key from `configs/topics.yaml`.
-2. `--pdf-dir`: input PDF directory.
-3. `--out`: output markdown report path.
+## 3. Two Fetch Modes
 
-Config options:
+### Mode A (Recommended): Keyword Group Composition
 
-1. `--config`: topic config path (default `configs/topics.yaml`).
-2. `--prompt-config`: prompt config path (default `configs/prompts.yaml`).
-3. `--work-dir`: cache/work directory (default `data`).
+Best for most users; no need to hand-write complex arXiv queries.
 
-Single-paper summary options:
-
-1. `--enable-single-paper-summary / --no-enable-single-paper-summary`
-2. `--single-summary-dir` (default `data/summaries`)
-3. `--reuse-single-summary / --no-reuse-single-summary`
-
-Model and parsing options:
-
-1. `--model`
-2. `--openai-api-key`
-3. `--openai-base-url`
-4. `--marker-cmd`
-5. `--max-chunks`
-6. `--min-findings`
-
-## What You Can Customize
-
-### 1) Topic Retrieval and Analysis Scope
-
-File: `configs/topics.yaml`
-
-You can customize for each topic:
-
-1. `synonyms`: retrieval expansion terms.
-2. `questions`: analysis dimensions (these affect both retrieval and summarization focus).
-
-Example dimensions currently used include:
-
-1. problem statement
-2. contributions
-3. methodology
-4. innovation
-5. experiments
-6. datasets
-7. open-source links
-8. limitations
-
-### 2) Prompt Templates and Output Schema
-
-File: `configs/prompts.yaml`
-
-You can customize:
-
-1. `single_paper_summary_prompt`
-2. `final_topic_summary_prompt`
-
-Current single-paper schema expected by prompt:
-
-```json
-{
-  "paper_summary": {
-    "paper_id": "...",
-    "title": "...",
-    "tasks": ["..."],
-    "github_links": ["..."],
-    "contributions": ["..."],
-    "data_sources": ["..."],
-    "methods": ["..."],
-    "experiments": ["..."],
-    "results": ["..."],
-    "limitations": ["..."],
-    "evidence": [{"chunk_id": "..."}]
-  }
-}
+```bash
+research fetch-arxiv \
+  --and-group autism,autistic \
+  --and-group llm,"large language model" \
+  --query-fields ti,abs
 ```
 
-### 3) PDF Parsing Backend
+Semantics:
 
-You can switch parsing command with:
+1. Each `--and-group` is OR within the group.
+2. Multiple `--and-group` options are ANDed together.
+3. `--query-fields ti,abs` maps each keyword to title and abstract fields.
 
-1. `MARKER_CMD` environment variable, or
-2. `--marker-cmd` CLI option
+### Mode B: Raw arXiv Query
 
-Behavior:
+Useful if you are already familiar with arXiv query syntax.
 
-1. If command contains `{input}` and `{output}`, placeholders are substituted directly.
-2. Otherwise command is invoked as `marker_single` style or `marker` style depending on binary name.
+```bash
+research fetch-arxiv \
+  --query '((ti:autism OR ti:autistic OR abs:autism OR abs:autistic) AND (ti:llm OR ti:"large language model" OR abs:llm OR abs:"large language model"))'
+```
 
-## Output and Cache Files
+## 4. Fetch With Topic Presets (Config-Driven)
 
-1. Parsed markdown: `data/parsed/*.md`
-2. Paper metadata: `data/meta/papers.jsonl`
-3. Single-paper summaries: `data/summaries/*.json`
-4. Audit log: `data/summaries/_audit.jsonl`
-5. Final report: `reports/topics/*.md`
+You can also define queries in config and fetch by topic only:
 
-## Important Behavior (Recent Changes)
+```bash
+research fetch-arxiv --topic autism_llm --arxiv-config configs/arxiv_topics.yaml --pdf-dir pdf
+```
 
-### 1) Summary cache invalidation is prompt-aware
+See `configs/arxiv_topics.yaml` for the current preset examples.
 
-Single summary JSON now includes `prompt_config_fingerprint`.
+## 5. Most Common Options (Cheat Sheet)
 
-1. If `configs/prompts.yaml` content changes, old cached summaries are treated as stale.
-2. With `--reuse-single-summary`, stale files are automatically regenerated.
+### research fetch-arxiv
 
-### 2) Single summary schema normalization
+1. Query input: `--query` or `--and-group` or `--topic`
+2. Date range: `--date-from` `--date-to`
+3. Download directory: `--pdf-dir`
+4. Manifest path: `--manifest`
+5. Volume and sorting: `--max-results` `--sort`
+6. Category filter: `--categories` (for example `cs.CL,cs.AI`)
+7. Other: `--dry-run` `--force` `--as-json`
 
-Before use/save, summary objects are normalized to the canonical schema.
+### research analyze
 
-1. Required list fields are guaranteed to exist (empty list if missing).
-2. Legacy aliases are mapped:
-   1. `evaluation` -> `experiments`
-   2. `deployment` -> `results`
-3. Non-schema fields are dropped.
-4. Evidence `chunk_id` values are canonicalized and validated against source chunks.
+1. Input directory: `--pdf-dir`
+2. Output report: `--out`
+3. Topic config: `--config`
+4. Prompt config: `--prompt-config`
+5. Cache directories: `--work-dir` `--single-summary-dir`
 
-### 3) Evidence validation fallback
+## 6. Configuration Files
 
-Final summarization still builds model context from selected retrieved chunks, but evidence validation can fall back to all chunks.
+1. `configs/arxiv_topics.yaml`: fetch presets (query, query_terms, categories, date, max_results, etc.)
+2. `configs/topics.yaml`: analysis topics (synonyms, questions)
+3. `configs/prompts.yaml`: prompts for single-paper and final-topic summaries
 
-This prevents "subset mismatch" from dropping valid evidence that exists in full parsed content but was not in the top-k retrieval subset.
+## 7. Output Paths
 
-## Troubleshooting
+1. Fetch manifest: `data/arxiv/fetch_manifest.jsonl`
+2. Parsed markdown: `data/parsed/*.md` (or custom `--work-dir`)
+3. Paper metadata: `data/meta/papers.jsonl`
+4. Single-paper summaries: `data/summaries/*.json` (or custom `--single-summary-dir`)
+5. Final reports: `reports/topics/*.md`
 
-1. `Topic not found in config`: check the exact key under `topics:` in `configs/topics.yaml`.
-2. Marker command not found: install `marker_single`/`marker` or set `--marker-cmd`.
-3. Summaries do not reflect new prompt: rerun once (prompt fingerprint will invalidate stale cache automatically).
-4. You can force fresh run by deleting `data/summaries/*.json`.
+## 8. FAQ
 
-## Development
+1. Error: `Topic not found in config`
+Check whether topic names match in `configs/topics.yaml` or `configs/arxiv_topics.yaml`.
 
-Run tests:
+2. Error: Marker command not found
+Install `marker_single`, or specify command via `--marker-cmd`.
+
+3. Stage 2 did not generate a report
+Ensure `OPENAI_API_KEY` is set and `--pdf-dir` actually contains PDFs.
+
+4. Want to force re-run summarization
+Delete summary caches, or switch `--work-dir` / `--single-summary-dir`.
+
+## 9. Development & Testing
 
 ```bash
 pytest -q

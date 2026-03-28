@@ -6,7 +6,13 @@ import shutil
 import typer
 from dotenv import load_dotenv
 
-from .config import load_topic_config
+from .arxiv.fetcher import fetch_and_download, paper_to_console_row, result_to_json
+from .config import (
+    build_arxiv_fetch_request,
+    build_arxiv_query_from_keyword_groups,
+    load_arxiv_topic_config,
+    load_topic_config,
+)
 from .analyzer.pipeline import analyze_topic
 
 load_dotenv()
@@ -21,6 +27,16 @@ def _default_marker_cmd() -> str:
     return "marker"
 
 app = typer.Typer(help="Local PDF research pipeline.")
+
+
+def _split_csv(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _split_keyword_group(raw: str) -> list[str]:
+    return [item.strip() for item in raw.split(",") if item.strip()]
 
 
 @app.command()
@@ -96,3 +112,136 @@ def analyze(
         min_findings=min_findings,
         enable_single_paper_summary=enable_single_paper_summary,
     )
+
+
+@app.command("fetch-arxiv")
+def fetch_arxiv(
+    query: str | None = typer.Option(
+        None,
+        help="Raw arXiv query string. If omitted, can be built from --and-group or loaded from --topic.",
+    ),
+    and_group: list[str] = typer.Option(
+        [],
+        help=(
+            "Comma-separated OR-keywords for one group; pass this option multiple times "
+            "to create AND groups. Example: --and-group autism,autistic --and-group llm,\"large language model\""
+        ),
+    ),
+    query_fields: str = typer.Option(
+        "ti,abs",
+        help="Comma-separated query fields for keyword groups: ti,abs,all.",
+    ),
+    topic: str | None = typer.Option(
+        None,
+        help="Topic key in arXiv YAML config.",
+    ),
+    arxiv_config: Path = typer.Option(
+        Path("configs/arxiv_topics.yaml"),
+        help="YAML configuration for arXiv query presets.",
+    ),
+    pdf_dir: Path = typer.Option(
+        Path("pdf"),
+        file_okay=False,
+        dir_okay=True,
+        help="Directory to save downloaded PDFs.",
+    ),
+    manifest: Path = typer.Option(
+        Path("data/arxiv/fetch_manifest.jsonl"),
+        help="JSONL manifest path for fetch/download records.",
+    ),
+    categories: str | None = typer.Option(
+        None,
+        help="Comma-separated arXiv categories, e.g. cs.CL,cs.AI.",
+    ),
+    max_results: int | None = typer.Option(
+        None,
+        min=1,
+        help="Maximum number of papers to request.",
+    ),
+    sort: str | None = typer.Option(
+        None,
+        help="Sort criterion: submittedDate, lastUpdatedDate, relevance.",
+    ),
+    date_from: str | None = typer.Option(
+        None,
+        help="Inclusive lower bound of publication date (YYYY-MM-DD).",
+    ),
+    date_to: str | None = typer.Option(
+        None,
+        help="Inclusive upper bound of publication date (YYYY-MM-DD).",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        help="Only search/filter without downloading PDFs.",
+    ),
+    force: bool = typer.Option(
+        False,
+        help="Re-download even if target file already exists.",
+    ),
+    as_json: bool = typer.Option(
+        False,
+        help="Print result summary in JSON format.",
+    ),
+):
+    if not query and not topic and not and_group:
+        raise typer.BadParameter("Provide one of --query, --and-group, or --topic.")
+
+    base_query = query
+    if not base_query and and_group:
+        groups = [_split_keyword_group(item) for item in and_group]
+        fields = _split_csv(query_fields) or ["ti", "abs"]
+        base_query = build_arxiv_query_from_keyword_groups(groups, fields)
+        if not base_query:
+            raise typer.BadParameter("--and-group did not produce a valid query.")
+
+    base_categories = _split_csv(categories)
+    base_max_results = max_results
+    base_sort = sort
+    base_date_from = date_from
+    base_date_to = date_to
+
+    if topic:
+        topic_config = load_arxiv_topic_config(arxiv_config, topic)
+        if not base_query:
+            base_query = topic_config.query
+        if not base_categories:
+            base_categories = topic_config.categories
+        if base_max_results is None:
+            base_max_results = topic_config.max_results
+        if base_sort is None:
+            base_sort = topic_config.sort
+        if base_date_from is None:
+            base_date_from = topic_config.date_from
+        if base_date_to is None:
+            base_date_to = topic_config.date_to
+
+    request = build_arxiv_fetch_request(
+        query=base_query or "",
+        categories=base_categories,
+        max_results=base_max_results,
+        sort=base_sort,
+        date_from=base_date_from,
+        date_to=base_date_to,
+    )
+
+    result = fetch_and_download(
+        request=request,
+        pdf_dir=pdf_dir,
+        manifest_path=manifest,
+        dry_run=dry_run,
+        force=force,
+    )
+
+    if as_json:
+        typer.echo(result_to_json(result))
+        return
+
+    typer.echo(
+        f"query={result.query} requested={result.requested} matched={result.matched} "
+        f"downloaded={result.downloaded} skipped_existing={result.skipped_existing}"
+    )
+    for paper in result.papers:
+        row = paper_to_console_row(paper)
+        typer.echo(
+            f"[{row['arxiv_id']}] {row['published']} {row['title']} ({row['categories']})"
+        )
