@@ -1,0 +1,2 @@
+[console_scripts]
+research = research_pipeline.cli:app

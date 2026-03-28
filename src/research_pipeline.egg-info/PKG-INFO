@@ -1,3 +1,17 @@
+Metadata-Version: 2.4
+Name: research-pipeline
+Version: 0.1.0
+Summary: Local PDF research pipeline with evidence-linked reports.
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: openai>=1.30.0
+Requires-Dist: python-dotenv>=1.0.1
+Requires-Dist: pydantic>=2.6.0
+Requires-Dist: pyyaml>=6.0.1
+Requires-Dist: typer>=0.12.0
+Dynamic: license-file
+
 # Auto Paper Research
 
 This repository provides a modular pipeline to analyze local PDFs for a topic and generate a markdown report with evidence lines.
@@ -27,7 +41,6 @@ research --topic "autism large language model" --out reports/topics/autism_llm.m
 
 By default, the CLI reads PDFs from `pdf/`.
 You can override with `--pdf-dir /path/to/pdfs`.
-Prompt templates are loaded from `configs/prompts.yaml` by default.
 
 Required environment variables:
 
@@ -38,7 +51,6 @@ Required environment variables:
 Required runtime dependency:
 
 - `marker`: CLI used to convert PDF to Markdown.
-  - The pipeline will use `marker_single` automatically when available, otherwise it falls back to `marker`.
   - Install and make sure it is available in `PATH`, or pass `--marker-cmd`/`MARKER_CMD`.
   - If `MARKER_CMD` contains `{input}` and `{output}`, they are substituted directly.
 
@@ -46,10 +58,6 @@ Optional configuration:
 
 - `OPENAI_MODEL`: overrides the default model (`gpt-4.1-mini`).
 - `MARKER_CMD`: command template for the Marker CLI. If it contains `{input}` and `{output}`, they will be substituted. Otherwise the command is invoked as `marker --input <pdf> --output <md>`.
-- `--prompt-config`: path to prompt template config file (single-paper + final-topic prompts).
-- `--enable-single-paper-summary / --no-enable-single-paper-summary`: enable or disable per-paper summary stage before final synthesis.
-- `--single-summary-dir`: directory for storing per-paper summary JSON files (default: `data/summaries`).
-- `--reuse-single-summary / --no-reuse-single-summary`: reuse existing per-paper summary JSON files when available.
 
 ## Notes
 
